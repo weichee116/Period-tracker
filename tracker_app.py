@@ -69,3 +69,53 @@ st.subheader(f"📅 当前阶段：{status}")
 st.write(f"**🍽️ 推荐吃什么：** {health_advice[status]['eat']}")
 st.write(f"**🍵 推荐喝什么：** {health_advice[status]['drink']}")
 st.info(f"**💡 专业建议：** {health_advice[status]['tips']}")
+
+
+# --- 第四步：添加到手机日历功能 (.ics 生成) ---
+st.divider()
+st.subheader("⏰ 设置手机提醒")
+st.write("点击下方按钮，将重要日子直接加入你的手机自带日历！")
+
+# 定义一个生成日历文件的函数
+def create_ics(title, event_date, description):
+    # 将日期转换为日历标准格式 (YYYYMMDD)
+    date_str = event_date.strftime("%Y%m%d")
+    ics_content = f"""BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+DTSTART;VALUE=DATE:{date_str}
+SUMMARY:{title}
+DESCRIPTION:{description}
+END:VEVENT
+END:VCALENDAR"""
+    return ics_content
+
+col3, col4 = st.columns(2)
+
+# 按钮 1：提醒下次月经
+with col3:
+    period_ics = create_ics(
+        "🩸 预计月经期", 
+        next_period, 
+        f"记得准备卫生用品，多喝温水！建议：{health_advice['月经期']['tips']}"
+    )
+    st.download_button(
+        label="📅 添加【下次月经】",
+        data=period_ics,
+        file_name="next_period.ics",
+        mime="text/calendar"
+    )
+
+# 按钮 2：提醒排卵日
+with col4:
+    ovulation_ics = create_ics(
+        "✨ 预计排卵日", 
+        ovulation_day, 
+        f"今天是排卵日！建议：{health_advice['排卵期']['tips']}"
+    )
+    st.download_button(
+        label="📅 添加【排卵日】",
+        data=ovulation_ics,
+        file_name="ovulation_day.ics",
+        mime="text/calendar"
+    )
