@@ -27,7 +27,7 @@ init_files()
 doctor_advice = {
     "月经期": {
         "header": "🩸 月经期：关怀与补给 (第1-5天，假设)",
-        "diet": ["铁质补充： spinach、红肉、猪肝、黑木耳", "温热饮食：生姜红糖水、热牛奶", "Omega-3抗炎：三文鱼、核桃"],
+        "diet": ["铁质补充：菠菜、红肉、猪肝、黑木耳", "温热饮食：生姜红糖水、热牛奶", "Omega-3抗炎：三文鱼、核桃"],
         "exercise": ["轻度有氧：慢走、舒缓冥想", "专注于拉伸：避免剧烈跳跃或负重训练", "倾听身体：不适即止，多休息"],
         "medical": ["腹部保暖：使用暖宝宝或热水袋", "充足睡眠：保证 7-8 小时高质量睡眠", "卫生注意：勤换卫生用品"]
     },
@@ -84,7 +84,7 @@ def login_register_page():
             else:
                 st.error("用户名不存在！")
 
-    with tab tabs:
+    with tab2:  # 修复了这里的拼写错误
         st.subheader("新用户注册")
         reg_user = st.text_input("设置用户名", key="reg_user")
         reg_pwd = st.text_input("设置密码", type="password", key="reg_pwd")
@@ -144,7 +144,6 @@ def main_dashboard():
             chart_data.columns = ['日期', '周期天数']
             
             # 使用简单的 Streamlit 折线图展示
-            # 如果想展示最新的周期在右侧，数据需要按日期升序
             st.line_chart(chart_data.set_index('日期'))
             
             # 显示简要统计
