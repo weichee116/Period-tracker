@@ -1,5 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
+import pandas as pd
+import os
 
 # --- 第一步：页面基础设置 ---
 st.set_page_config(page_title="女性健康与周期助手", page_icon="🌸", layout="centered")
@@ -73,12 +75,9 @@ st.info(f"**💡 专业建议：** {health_advice[status]['tips']}")
 
 # --- 第四步：添加到手机日历功能 (.ics 生成) ---
 st.divider()
-st.subheader("⏰ 设置手机提醒")
-st.write("点击下方按钮，将重要日子直接加入你的手机自带日历！")
+st.write("⏰ **设置手机提醒：** 点击下方按钮，将重要日子直接加入你的手机自带日历！")
 
-# 定义一个生成日历文件的函数
 def create_ics(title, event_date, description):
-    # 将日期转换为日历标准格式 (YYYYMMDD)
     date_str = event_date.strftime("%Y%m%d")
     ics_content = f"""BEGIN:VCALENDAR
 VERSION:2.0
@@ -91,31 +90,56 @@ END:VCALENDAR"""
     return ics_content
 
 col3, col4 = st.columns(2)
-
-# 按钮 1：提醒下次月经
 with col3:
-    period_ics = create_ics(
-        "🩸 预计月经期", 
-        next_period, 
-        f"记得准备卫生用品，多喝温水！建议：{health_advice['月经期']['tips']}"
-    )
-    st.download_button(
-        label="📅 添加【下次月经】",
-        data=period_ics,
-        file_name="next_period.ics",
-        mime="text/calendar"
-    )
-
-# 按钮 2：提醒排卵日
+    period_ics = create_ics("🩸 预计月经期", next_period, f"建议：{health_advice['月经期']['tips']}")
+    st.download_button("📅 添加【下次月经】", data=period_ics, file_name="next_period.ics", mime="text/calendar")
 with col4:
-    ovulation_ics = create_ics(
-        "✨ 预计排卵日", 
-        ovulation_day, 
-        f"今天是排卵日！建议：{health_advice['排卵期']['tips']}"
-    )
-    st.download_button(
-        label="📅 添加【排卵日】",
-        data=ovulation_ics,
-        file_name="ovulation_day.ics",
-        mime="text/calendar"
-    )
+    ovulation_ics = create_ics("✨ 预计排卵日", ovulation_day, f"建议：{health_advice['排卵期']['tips']}")
+    st.download_button("📅 添加【排卵日】", data=ovulation_ics, file_name="ovulation_day.ics", mime="text/calendar")
+
+
+# --- 第五步：每日症状与心情记录 ---
+st.divider()
+st.subheader("📝 每日症状与心情日记")
+
+# 定义保存数据的文件名
+DATA_FILE = "symptoms_log.csv"
+
+# 初始化或读取历史数据
+if os.path.exists(DATA_FILE):
+    df_history = pd.read_csv(DATA_FILE)
+else:
+    df_history = pd.DataFrame(columns=["日期", "心情", "症状", "备注"])
+
+# 记录表单 (使用 expander 可以折叠，让界面更整洁)
+with st.expander("➕ 添加 / 更新今日记录", expanded=True):
+    with st.form("symptom_form"):
+        record_date = st.date_input("记录日期", today)
+        mood = st.select_slider("今日心情", options=["😭 崩溃", "😔 低落", "😐 平静", "🙂 开心", "😄 极佳"], value="😐 平静")
+        symptoms = st.multiselect("身体症状 (可多选)", ["腹痛", "头痛", "胸部胀痛", "疲劳", "情绪波动", "长痘", "嗜睡", "腰酸", "无不适"])
+        notes = st.text_area("其他备注 / 饮食日记", placeholder="今天吃了什么？感觉怎么样？")
+        
+        submitted = st.form_submit_button("💾 保存记录")
+        
+        if submitted:
+            # 创建新数据行
+            new_data = pd.DataFrame({
+                "日期": [str(record_date)],
+                "心情": [mood],
+                "症状": [", ".join(symptoms) if symptoms else "无"],
+                "备注": [notes]
+            })
+            
+            # 合并新数据并保存到本地 CSV 文件
+            df_history = pd.concat([df_history, new_data], ignore_index=True)
+            # 按日期倒序排列（最新的在最上面），并去除同一天的重复记录（保留最新的）
+            df_history = df_history.drop_duplicates(subset=['日期'], keep='last').sort_values(by="日期", ascending=False)
+            df_history.to_csv(DATA_FILE, index=False)
+            
+            st.success("✅ 记录保存成功！请刷新页面查看最新表格。")
+
+# 显示历史记录表格
+if not df_history.empty:
+    st.write("📖 **你的历史记录：**")
+    # 使用 dataframe 展示，隐藏左侧的默认数字索引
+    st.dataframe(df_history, use_container_width=True, hide_index=True)
