@@ -3,18 +3,13 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import hashlib
+import calendar
 
 # ==========================================
-# 🌸 1. UI & Dark Mode 深度适配 (解决 UI 消失问题)
+# 🌸 1. 现代质感 UI & 手机适配
 # ==========================================
-st.set_page_config(
-    page_title="Glow Cycle Tracker", 
-    page_icon="🌸", 
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Glow Pro", page_icon="🌸", layout="centered")
 
-# 核心 CSS：确保在 Dark Mode 和 Light Mode 下建议板块都清晰可见
 st.markdown("""
 <head>
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3667/3667231.png">
@@ -23,21 +18,11 @@ st.markdown("""
 </head>
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Nunito', 'PingFang SC', sans-serif !important;
-    }
-
-    /* 建议板块卡片样式优化 */
-    .stExpander {
-        border-radius: 16px !important;
-        border: 1px solid rgba(255, 107, 129, 0.3) !important;
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-        margin-bottom: 1rem;
-    }
-
-    /* 按钮样式：确保在深色模式下文字也清晰 */
+    html, body, [class*="css"] { font-family: 'Nunito', 'PingFang SC', sans-serif !important; }
+    .stApp { background-color: #FFFDFD !important; }
+    
+    /* 侧边栏及按钮 */
+    [data-testid="stSidebar"] { background-color: #FFF0F5 !important; }
     .stButton>button {
         background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%) !important;
         color: #721c24 !important;
@@ -45,16 +30,27 @@ st.markdown("""
         border: none !important;
         font-weight: 800 !important;
         width: 100%;
-        padding: 0.5rem 1rem !important;
+        box-shadow: 0 4px 10px rgba(255, 154, 158, 0.3);
     }
-
-    /* Metric 数值颜色，适配深色模式 */
-    [data-testid="stMetricValue"] {
-        color: #FF6B81 !important;
+    
+    /* 卡片美化 */
+    .stExpander {
+        border-radius: 16px !important;
+        border: 1px solid rgba(255, 107, 129, 0.2) !important;
+        background-color: white !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.02) !important;
     }
-
-    /* 强力修复暗色模式文字不可见问题 */
+    
+    /* 标签页样式优化 */
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #F8F9FA;
+        border-radius: 10px 10px 0 0;
+        padding: 10px 20px;
+    }
+    
     @media (prefers-color-scheme: dark) {
+        .stApp { background-color: #121212 !important; }
         .stMarkdown, p, label, span { color: #F0F0F0 !important; }
         .stExpander { background-color: #1E1E1E !important; }
     }
@@ -62,209 +58,176 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🌐 2. 多语言翻译字典
+# 🌐 2. 多语言系统
 # ==========================================
-if 'lang' not in st.session_state:
-    st.session_state.lang = 'zh'
+if 'lang' not in st.session_state: st.session_state.lang = 'zh'
 
 lang_dict = {
     'zh': {
-        'app_title': "🌸 Glow 周期助手",
-        'welcome': "欢迎回来！请登录以查看您的健康建议。",
-        'tab_login': "🔑 登录", 'tab_reg': "📝 注册",
-        'username': "用户名", 'pwd': "密码",
-        'btn_login': "进入系统", 'btn_reg': "立即注册",
-        'login_ok': "登录成功！", 'login_fail': "密码错误！", 'user_none': "用户名不存在，请先注册！",
-        'reg_ok': "注册成功！请切换到登录标签页。", 'reg_err_exists': "该用户名已存在！", 'reg_err_short': "名字太短啦！",
-        'sidebar_hi': "👤 您好", 'sidebar_len': "平均经期天数", 'btn_logout': "👋 退出登录",
-        'dash_title': "📊 健康数据看板", 'chart_title': "📊 周期趋势 (天)",
-        'record_title': "🩸 记录月经第一天", 'record_date': "选择日期", 'btn_save_date': "💾 保存日期",
-        'pred_title': "🔮 智能预测", 'pred_last': "最后一次", 'pred_avg': "平均周期", 'pred_next': "✨ 排卵日",
-        'pred_result': "预测下次月经日",
-        'adv_title': "👨‍⚕️ 专业建议", 'adv_diet': "🍽️ 饮食建议", 'adv_exe': "🏃🏻‍♀️ 运动建议", 'adv_med': "💡 医学贴士",
-        'log_title': "📝 每日日记", 'btn_save_log': "💾 保存日记", 'hist_title': "📖 历史记录",
-        'phase_menstrual': "月经期", 'phase_follicular': "滤泡期", 'phase_ovulation': "排卵期", 'phase_luteal': "黄体期",
-        'moods': ["😭 崩溃", "😔 低落", "😐 平静", "🙂 开心", "😄 极佳"],
-        'syms': ["腹痛", "头痛", "胸痛", "疲劳", "长痘", "腰酸", "无不适"]
+        'app_title': "🌸 Glow Pro 智能助手",
+        'tab_dash': "📈 看板", 'tab_cal': "📅 日历", 'tab_log': "📝 记录", 'tab_set': "⚙️ 数据",
+        'sidebar_len': "平均经期天数", 'btn_logout': "👋 退出登录",
+        'pred_next': "下次月经预计", 'pred_ovu': "排卵日预计",
+        'adv_title': "👨‍⚕️ 阶段建议", 'adv_diet': "🍽️ 饮食", 'adv_exe': "🏃‍♀️ 运动", 'adv_med': "💡 贴士",
+        'log_habits': "💊 习惯打卡", 'habit_water': "今日喝够 2L 水", 'habit_vit': "今日已吃保健品/叶酸",
+        'export_btn': "📥 导出就医报告 (CSV)", 'hist_title': "📖 历史日志",
+        'phase_menstrual': "月经期", 'phase_follicular': "滤泡期", 'phase_ovulation': "排卵期", 'phase_luteal': "黄体期"
     },
     'en': {
-        'app_title': "🌸 Glow Tracker",
-        'welcome': "Welcome! Login to see your advice.",
-        'tab_login': "🔑 Login", 'tab_reg': "📝 Register",
-        'username': "Username", 'pwd': "Password",
-        'btn_login': "Sign In", 'btn_reg': "Sign Up",
-        'login_ok': "Success!", 'login_fail': "Incorrect password!", 'user_none': "User not found, please register!",
-        'reg_ok': "Success! Now please login.", 'reg_err_exists': "Username already exists!", 'reg_err_short': "Username too short!",
-        'sidebar_hi': "👤 Hi", 'sidebar_len': "Avg Period Days", 'btn_logout': "👋 Logout",
-        'dash_title': "📊 Health Dashboard", 'chart_title': "📊 Cycle Trends (Days)",
-        'record_title': "🩸 Log Period Start", 'record_date': "Select Date", 'btn_save_date': "💾 Save Date",
-        'pred_title': "🔮 Predictions", 'pred_last': "Last Log", 'pred_avg': "Avg Cycle", 'pred_next': "✨ Ovulation",
-        'pred_result': "Next Period Date",
-        'adv_title': "👨‍⚕️ Advice", 'adv_diet': "🍽️ Diet", 'adv_exe': "🏃🏻‍♀️ Exercise", 'adv_med': "💡 Health Tips",
-        'log_title': "📝 Daily Journal", 'btn_save_log': "💾 Save Log", 'hist_title': "📖 History Logs",
-        'phase_menstrual': "Menstrual", 'phase_follicular': "Follicular", 'phase_ovulation': "Ovulation", 'phase_luteal': "Luteal",
-        'moods': ["😭 Awful", "😔 Sad", "😐 Okay", "🙂 Good", "😄 Great"],
-        'syms': ["Cramps", "Headache", "Tender", "Fatigue", "Acne", "Backache", "None"]
+        'app_title': "🌸 Glow Pro Tracker",
+        'tab_dash': "📈 Dash", 'tab_cal': "📅 Calendar", 'tab_log': "📝 Log", 'tab_set': "⚙️ Data",
+        'sidebar_len': "Avg Period Days", 'btn_logout': "👋 Logout",
+        'pred_next': "Next Period", 'pred_ovu': "Est. Ovulation",
+        'adv_title': "👨‍⚕️ Daily Advice", 'adv_diet': "🍽️ Diet", 'adv_exe': "🏃‍♀️ Exercise", 'adv_med': "💡 Tips",
+        'log_habits': "💊 Habit Tracker", 'habit_water': "2L Water Done", 'habit_vit': "Vitamins Taken",
+        'export_btn': "📥 Export Medical Report (CSV)", 'hist_title': "📖 History Logs",
+        'phase_menstrual': "Menstrual", 'phase_follicular': "Follicular", 'phase_ovulation': "Ovulation", 'phase_luteal': "Luteal"
     }
 }
-
 def t(key): return lang_dict[st.session_state.lang].get(key, key)
 
-# --- 专业建议数据库 ---
+# --- 医生建议数据 ---
 doctor_advice = {
-    "menstrual": {
-        "zh": {"diet": ["补铁：红肉、菠菜", "喝生姜红糖水"], "exe": ["慢走", "轻度拉伸"], "med": ["注意腹部保暖", "多休息"]},
-        "en": {"diet": ["Iron: Red meat, Spinach", "Ginger tea"], "exe": ["Walking", "Stretching"], "med": ["Stay warm", "More rest"]}
-    },
-    "follicular": {
-        "zh": {"diet": ["优质蛋白：鱼、鸡肉", "多吃西兰花"], "exe": ["慢跑", "游泳"], "med": ["精力充沛期", "适合工作挑战"]},
-        "en": {"diet": ["Protein: Fish, Chicken", "Broccoli"], "exe": ["Jogging", "Swimming"], "med": ["High energy", "Work hard!"]}
-    },
-    "ovulation": {
-        "zh": {"diet": ["补充叶酸：鸡蛋", "多喝水 2L+"], "exe": ["HIIT 训练", "力量练习"], "med": ["黄金受孕期", "保持心情愉快"]},
-        "en": {"diet": ["Folic acid: Eggs", "Water 2L+"], "exe": ["HIIT", "Strength"], "med": ["Peak fertility", "Stay happy"]}
-    },
-    "luteal": {
-        "zh": {"diet": ["复合碳水：燕麦", "富含镁：香蕉"], "exe": ["瑜伽", "普拉提"], "med": ["预防 PMS", "减少咖啡因"]},
-        "en": {"diet": ["Carbs: Oats", "Magnesium: Bananas"], "exe": ["Yoga", "Pilates"], "med": ["Watch for PMS", "Less caffeine"]}
-    }
+    "menstrual": {"zh": {"d": ["补铁：红肉", "温水"], "e": ["慢走"], "m": ["注意保暖"]}, "en": {"d": ["Iron: Red meat", "Warm water"], "e": ["Walk"], "m": ["Stay warm"]}},
+    "follicular": {"zh": {"d": ["高蛋白：鱼"], "e": ["慢跑"], "m": ["精力充沛"]}, "en": {"d": ["Protein: Fish"], "e": ["Jogging"], "m": ["High energy"]}},
+    "ovulation": {"zh": {"d": ["备孕叶酸"], "e": ["HIIT训练"], "m": ["黄金期"]}, "en": {"d": ["Folic acid"], "e": ["HIIT"], "m": ["Prime time"]}},
+    "luteal": {"zh": {"d": ["复合碳水"], "e": ["瑜伽"], "m": ["预防PMS"]}, "en": {"d": ["Complex carbs"], "e": ["Yoga"], "m": ["PMS alert"]}}
 }
 
-# --- 3. 核心数据存储逻辑 (修正注册/登录 Bug) ---
+# ==========================================
+# 📂 3. 数据持久化逻辑
+# ==========================================
 USERS_FILE = "users.csv"
 DATA_FILE = "health_log.csv"
-
-def make_hash(password): return hashlib.sha256(str.encode(password)).hexdigest()
-
+def make_hash(p): return hashlib.sha256(str.encode(p)).hexdigest()
 def init_files():
     if not os.path.exists(USERS_FILE): pd.DataFrame(columns=["username", "password_hash"]).to_csv(USERS_FILE, index=False)
-    if not os.path.exists(DATA_FILE): pd.DataFrame(columns=["username", "type", "date", "menses_length", "mood", "symptoms", "notes"]).to_csv(DATA_FILE, index=False)
-
+    if not os.path.exists(DATA_FILE): pd.DataFrame(columns=["username", "type", "date", "mood", "symptoms", "notes", "water", "vit"]).to_csv(DATA_FILE, index=False)
 init_files()
 
-# 初始化登录状态
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 
-# --- 4. 侧边栏 ---
-st.sidebar.markdown("### 🌐 Language")
-lang_choice = st.sidebar.radio(" ", ["中文", "English"], index=0 if st.session_state.lang == 'zh' else 1, label_visibility="collapsed")
-st.session_state.lang = 'zh' if lang_choice == "中文" else 'en'
-
 # ==========================================
-# 5. 页面路由 (注册与登录修复版)
+# 核心逻辑：登录页
 # ==========================================
 if not st.session_state.logged_in:
     st.title(t('app_title'))
-    tab1, tab2 = st.tabs([t('tab_login'), t('tab_reg')])
+    lang_choice = st.radio("Language", ["中文", "English"], horizontal=True)
+    st.session_state.lang = 'zh' if lang_choice == "中文" else 'en'
     
-    with tab1:
-        # 登录逻辑修复：增加 strip() 防止空格错误
-        u_login = st.text_input(t('username'), key="login_user_input").strip()
-        p_login = st.text_input(t('pwd'), type="password", key="login_pwd_input")
-        if st.button(t('btn_login')):
+    t1, t2 = st.tabs(["Login", "Register"])
+    with t1:
+        u = st.text_input("User", key="l_u").strip()
+        p = st.text_input("Pwd", type="password", key="l_p")
+        if st.button("Sign In"):
             udf = pd.read_csv(USERS_FILE)
-            if u_login in udf['username'].values:
-                stored_hash = udf.loc[udf['username'] == u_login, 'password_hash'].values[0]
-                if make_hash(p_login) == stored_hash:
-                    st.session_state.logged_in = True
-                    st.session_state.current_user = u_login
-                    st.rerun()
-                else: st.error(t('login_fail'))
-            else: st.error(t('user_none'))
-            
-    with tab2:
-        # 注册逻辑修复：增加重复性检查
-        u_reg = st.text_input(t('username'), key="reg_user_input").strip()
-        p_reg = st.text_input(t('pwd'), type="password", key="reg_pwd_input")
-        if st.button(t('btn_reg')):
+            if u in udf['username'].values and make_hash(p) == udf.loc[udf['username']==u, 'password_hash'].values[0]:
+                st.session_state.logged_in = True
+                st.session_state.current_user = u
+                st.rerun()
+            else: st.error("Login Error")
+    with t2:
+        ru = st.text_input("New User", key="r_u").strip()
+        rp = st.text_input("New Pwd", type="password", key="r_p")
+        if st.button("Register"):
             udf = pd.read_csv(USERS_FILE)
-            if u_reg in udf['username'].values:
-                st.error(t('reg_err_exists'))
-            elif len(u_reg) < 3:
-                st.warning(t('reg_err_short'))
-            else:
-                new_u = pd.DataFrame({"username": [u_reg], "password_hash": [make_hash(p_reg)]})
-                pd.concat([udf, new_u], ignore_index=True).to_csv(USERS_FILE, index=False)
-                st.success(t('reg_ok'))
-
+            if ru and ru not in udf['username'].values:
+                pd.concat([udf, pd.DataFrame({"username":[ru], "password_hash":[make_hash(rp)]})]).to_csv(USERS_FILE, index=False)
+                st.success("Registered!")
+# ==========================================
+# 核心逻辑：主界面 (Tab 布局)
+# ==========================================
 else:
-    # 登录后的面板
-    st.sidebar.title(f"{t('sidebar_hi')}, {st.session_state.current_user}")
+    # 侧边栏控制
+    st.sidebar.title(f"👤 {st.session_state.current_user}")
     m_len = st.sidebar.number_input(t('sidebar_len'), 2, 10, 5)
+    st.sidebar.divider()
     if st.sidebar.button(t('btn_logout')):
         st.session_state.logged_in = False
         st.rerun()
 
-    st.title(t('dash_title'))
+    # 主 Tab 切换
+    tab_dash, tab_cal, tab_log, tab_set = st.tabs([t('tab_dash'), t('tab_cal'), t('tab_log'), t('tab_set')])
+    
     df = pd.read_csv(DATA_FILE)
     u_data = df[df['username'] == st.session_state.current_user].copy()
     u_data['date'] = pd.to_datetime(u_data['date'])
     p_recs = u_data[u_data['type'] == 'period_start'].sort_values('date')
+    avg = int(p_recs['date'].diff().dt.days.dropna().mean()) if len(p_recs)>=2 else 28
 
-    # 1. 趋势图
-    if len(p_recs) >= 2:
-        st.subheader(t('chart_title'))
-        p_recs['cycle'] = p_recs['date'].diff().dt.days
-        st.line_chart(p_recs.dropna().set_index('date')['cycle'])
+    # --- Tab 1: 看板 (预测与建议) ---
+    with tab_dash:
+        if len(p_recs) > 0:
+            last = p_recs['date'].iloc[-1].date()
+            nxt = last + timedelta(days=avg)
+            ovu = nxt - timedelta(days=14)
+            
+            c1, c2 = st.columns(2)
+            c1.metric(t('pred_next'), str(nxt))
+            c2.metric(t('pred_ovu'), str(ovu))
+            
+            # 阶段判断
+            today = datetime.now().date()
+            if last <= today < (last + timedelta(days=m_len)): pk = "menstrual"
+            elif (ovu - timedelta(days=5)) <= today <= (ovu + timedelta(days=1)): pk = "ovulation"
+            elif (last + timedelta(days=m_len)) <= today < (ovu - timedelta(days=5)): pk = "follicular"
+            else: pk = "luteal"
+            
+            st.info(f"✨ {t('adv_title')}: **{t('phase_'+pk)}**")
+            adv = doctor_advice[pk][st.session_state.lang]
+            ac1, ac2, ac3 = st.columns(3)
+            with ac1: st.write(f"**{t('adv_diet')}**\n" + "\n".join([f"• {i}" for i in adv['d']]))
+            with ac2: st.write(f"**{t('adv_exe')}**\n" + "\n".join([f"• {i}" for i in adv['e']]))
+            with ac3: st.write(f"**{t('adv_med')}**\n" + "\n".join([f"• {i}" for i in adv['m']]))
+        else:
+            st.warning("Please log your first period in 'Log' tab!")
 
-    # 2. 记录月经
-    with st.expander(t('record_title'), expanded=(len(p_recs)==0)):
-        d_input = st.date_input(t('record_date'), datetime.now())
+    # --- Tab 2: 视觉化预测日历 ---
+    with tab_cal:
+        st.subheader("🗓️ Future Outlook")
+        if len(p_recs) > 0:
+            last = p_recs['date'].iloc[-1].date()
+            # 预测未来三轮
+            predictions = []
+            for i in range(1, 4):
+                p_start = last + timedelta(days=avg * i)
+                o_day = p_start - timedelta(days=14)
+                predictions.append({"Month": p_start.strftime("%B"), "Period": p_start, "Ovulation": o_day})
+            
+            p_df = pd.DataFrame(predictions)
+            st.table(p_df)
+            st.caption("Tip: Use these dates to plan your trips or events! ✈️")
+        else:
+            st.write("No data to predict yet.")
+
+    # --- Tab 3: 记录与打卡 ---
+    with tab_log:
+        st.subheader(t('record_title'))
+        d_in = st.date_input("Start Date", datetime.now())
         if st.button(t('btn_save_date')):
-            nr = pd.DataFrame({"username":[st.session_state.current_user], "type":["period_start"], "date":[d_input.strftime("%Y-%m-%d")], "menses_length":[0], "mood":[""], "symptoms":[""], "notes":[""]})
+            nr = pd.DataFrame({"username":[st.session_state.current_user], "type":["period_start"], "date":[d_in.strftime("%Y-%m-%d")], "mood":[""], "symptoms":[""], "notes":[""], "water":[False], "vit":[False]})
             pd.concat([df, nr], ignore_index=True).to_csv(DATA_FILE, index=False)
             st.rerun()
-
-    # 3. 建议与预测 (强制显示逻辑修复)
-    if len(p_recs) > 0:
+            
         st.divider()
-        st.subheader(t('pred_title'))
-        # 计算平均周期，没有两次记录则默认 28
-        avg = int(p_recs['date'].diff().dt.days.dropna().mean()) if len(p_recs)>=2 else 28
-        last = p_recs['date'].iloc[-1].date()
-        nxt = last + timedelta(days=avg)
-        ovu = nxt - timedelta(days=14)
+        st.subheader(t('log_habits'))
+        with st.form("daily_form"):
+            ld = st.date_input("Today", datetime.now())
+            w = st.toggle(t('habit_water'))
+            v = st.toggle(t('habit_vit'))
+            m = st.select_slider("Mood", ["😭","😔","😐","🙂","😄"], value="😐")
+            n = st.text_area("Notes")
+            if st.form_submit_button(t('btn_save_log')):
+                nl = pd.DataFrame({"username":[st.session_state.current_user], "type":["daily_log"], "date":[ld.strftime("%Y-%m-%d")], "mood":[m], "symptoms":[""], "notes":[n], "water":[w], "vit":[v]})
+                pd.concat([df, nl], ignore_index=True).to_csv(DATA_FILE, index=False)
+                st.success("Saved!")
+
+    # --- Tab 4: 设置与导出 ---
+    with tab_set:
+        st.subheader(t('hist_title'))
+        # 导出报告
+        if not u_data.empty:
+            csv = u_data.to_csv(index=False).encode('utf-8')
+            st.download_button(t('export_btn'), data=csv, file_name=f"Glow_Report_{st.session_state.current_user}.csv", mime="text/csv")
         
-        c1, c2, c3 = st.columns(3)
-        c1.metric(t('pred_last'), str(last))
-        c2.metric(t('pred_avg'), f"{avg} d")
-        c3.metric(t('pred_next'), str(ovu))
-        st.success(f"**{t('pred_result')}: {nxt}**")
-
-        # 生理阶段判定
-        today = datetime.now().date()
-        if last <= today < (last + timedelta(days=m_len)): pk = "menstrual"
-        elif (ovu - timedelta(days=5)) <= today <= (ovu + timedelta(days=1)): pk = "ovulation"
-        elif (last + timedelta(days=m_len)) <= today < (ovu - timedelta(days=5)): pk = "follicular"
-        else: pk = "luteal"
-        
-        # 建议板块回归：强制刷新显示
-        st.markdown(f"### {t('adv_title')} - <span style='color:#FF6B81'>{t('phase_'+pk)}</span>", unsafe_allow_html=True)
-        adv = doctor_advice[pk][st.session_state.lang]
-        ac1, ac2, ac3 = st.columns(3)
-        with ac1:
-            with st.expander(t('adv_diet'), True):
-                for i in adv['diet']: st.write(f"• {i}")
-        with ac2:
-            with st.expander(t('adv_exe'), True):
-                for i in adv['exe']: st.write(f"• {i}")
-        with ac3:
-            with st.expander(t('adv_med'), True):
-                for i in adv['med']: st.write(f"• {i}")
-
-    # 4. 每日日记
-    st.divider()
-    st.subheader(t('log_title'))
-    with st.form("daily_log"):
-        ld = st.date_input("Date", datetime.now())
-        lm = st.select_slider(t('moods')[2], options=t('moods'))
-        ls = st.multiselect("Symptoms", t('syms'))
-        ln = st.text_area("Notes")
-        if st.form_submit_button(t('btn_save_log')):
-            nl = pd.DataFrame({"username":[st.session_state.current_user], "type":["daily_log"], "date":[ld.strftime("%Y-%m-%d")], "menses_length":[0], "mood":[lm], "symptoms":[", ".join(ls)], "notes":[ln]})
-            pd.concat([df, nl], ignore_index=True).to_csv(DATA_FILE, index=False)
-            st.rerun()
-
-    # 5. 历史记录
-    with st.expander(t('hist_title')):
-        st.dataframe(u_data[['date', 'type', 'mood', 'symptoms', 'notes']].sort_values('date', ascending=False), use_container_width=True, hide_index=True)
+        st.dataframe(u_data.sort_values('date', ascending=False), use_container_width=True, hide_index=True)
