@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 import hashlib
+import extra_streamlit_components as stx
 
 # ==========================================
 # 🌸 1. 极致响应式 UI & 手机端优化
@@ -19,12 +20,8 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap');
     html, body, [class*="css"] { font-family: 'Nunito', 'PingFang SC', sans-serif !important; }
     
-    /* 强力修正：确保在任何背景下文字都有高对比度 */
-    .stMarkdown, p, label, span, h1, h2, h3 {
-        color: inherit !important;
-    }
+    .stMarkdown, p, label, span, h1, h2, h3 { color: inherit !important; }
 
-    /* 按钮：固定渐变色 + 白色文字 */
     .stButton>button {
         background: linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%) !important;
         color: #B71C1C !important; 
@@ -34,7 +31,6 @@ st.markdown("""
         box-shadow: 0 4px 10px rgba(255, 154, 158, 0.3);
     }
     
-    /* 卡片容器：移除硬编码颜色，适配系统主题 */
     .stExpander {
         border-radius: 16px !important;
         border: 1px solid rgba(255, 107, 129, 0.4) !important;
@@ -46,7 +42,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 🌐 2. 纯净双语系统 (100% 覆盖)
+# 🍪 2. Cookie 管理器 (实现 30 天免登录)
+# ==========================================
+# 初始化 Cookie 管理器
+cookie_manager = stx.CookieManager()
+
+# ==========================================
+# 🌐 3. 纯净双语系统 (100% 覆盖)
 # ==========================================
 if 'lang' not in st.session_state: st.session_state.lang = 'zh'
 
@@ -96,7 +98,6 @@ lang_dict = {
 }
 def t(key): return lang_dict[st.session_state.lang].get(key, key)
 
-# --- 医生建议 ---
 doctor_advice = {
     "menstrual": {"zh": {"d": ["补铁：红肉", "温水"], "e": ["慢走"], "m": ["注意保暖"]}, "en": {"d": ["Iron", "Warm water"], "e": ["Walk"], "m": ["Stay warm"]}},
     "follicular": {"zh": {"d": ["高蛋白：鱼"], "e": ["慢跑"], "m": ["精力充沛"]}, "en": {"d": ["Protein"], "e": ["Jogging"], "m": ["High energy"]}},
@@ -105,7 +106,7 @@ doctor_advice = {
 }
 
 # ==========================================
-# 📂 3. 数据初始化
+# 📂 4. 数据初始化
 # ==========================================
 USERS_FILE = "users.csv"
 DATA_FILE = "health_log.csv"
@@ -116,9 +117,19 @@ def init_files():
 init_files()
 
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'current_user' not in st.session_state: st.session_state.current_user = ""
+
+# --- 🚀 自动登录拦截器 (读取 Cookie) ---
+# 给组件一点时间加载 cookie
+if not st.session_state.logged_in:
+    cached_user = cookie_manager.get(cookie="glow_pro_user")
+    if cached_user:
+        st.session_state.logged_in = True
+        st.session_state.current_user = cached_user
+        st.rerun()
 
 # ==========================================
-# 📱 页面逻辑
+# 📱 5. 页面逻辑
 # ==========================================
 if not st.session_state.logged_in:
     st.title(t('app_title'))
@@ -131,7 +142,10 @@ if not st.session_state.logged_in:
         if st.button(t('btn_in')):
             udf = pd.read_csv(USERS_FILE)
             if u in udf['username'].values and make_hash(p) == udf.loc[udf['username']==u, 'password_hash'].values[0]:
-                st.session_state.logged_in, st.session_state.current_user = True, u
+                st.session_state.logged_in = True
+                st.session_state.current_user = u
+                # 设置 30 天有效期的 Cookie
+                cookie_manager.set("glow_pro_user", u, expires_at=datetime.now() + timedelta(days=30))
                 st.rerun()
             else: st.error(t('login_err'))
     with t2:
@@ -147,7 +161,10 @@ else:
     m_len = st.sidebar.number_input(t('sidebar_len'), 2, 10, 5)
     st.sidebar.divider()
     if st.sidebar.button(t('btn_logout')):
+        # 退出时删除 Cookie
+        cookie_manager.delete("glow_pro_user")
         st.session_state.logged_in = False
+        st.session_state.current_user = ""
         st.rerun()
 
     tab_dash, tab_cal, tab_log, tab_set = st.tabs([t('tab_dash'), t('tab_cal'), t('tab_log'), t('tab_set')])
